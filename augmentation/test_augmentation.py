@@ -5,7 +5,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import time
 from augmentation import augment_image
-
+image_path = "augmentation/test.png"
 
 def _disabled_kwargs() -> Dict:
     """
@@ -195,15 +195,15 @@ def benchmark_augment(img: Image.Image, repeats: int = 1000, warmup: int = 20) -
 
 if __name__ == "__main__":
     # Example usage: update the path to your local test image.
-    plot_augmentations_grid(image_path="test.png",
+    plot_augmentations_grid(image_path,
                             save_path="aug_grid.png")
 
-    img = Image.open(image_path="test.png").convert("RGB")
+    img = Image.open(image_path).convert("RGB")
     metrics = benchmark_augment(img, repeats=1000, warmup=20)
 
     print("\nAugmentation Benchmark")
     print("----------------------")
-    print(f"Image:              {"test.png"}")
+    print(f"Image:              {image_path}")
     print(f"Iterations:         {metrics['repeats']}")
     print(f"Total time (s):     {metrics['total_seconds']:.4f}")
     print(f"Avg / image (ms):   {metrics['avg_milliseconds']:.3f}")
