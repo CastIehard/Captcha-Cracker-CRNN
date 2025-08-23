@@ -11,3 +11,6 @@ The goal is to predict the character sequence from a distorted CAPTCHA image, ha
 - Background noise
 
 Have fun experimenting with different models and techniques!
+
+## Getting started
+First step is to download the data from the [course materials](https://utn.instructure.com/courses/275/files/9592/download?download_frd=1).
