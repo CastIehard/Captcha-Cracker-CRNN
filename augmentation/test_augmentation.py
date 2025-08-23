@@ -3,7 +3,7 @@ import math
 import random
 from PIL import Image
 import matplotlib.pyplot as plt
-
+import time
 from augmentation import augment_image
 
 
@@ -149,7 +149,62 @@ def plot_augmentations_grid(
     plt.show()
 
 
+def benchmark_augment(img: Image.Image, repeats: int = 1000, warmup: int = 20) -> Dict:
+    """
+    Benchmark `augment_image` runtime on a single PIL image.
+
+    Parameters
+    ----------
+    img : PIL.Image.Image
+        Input image (will not be modified; a copy is used per call).
+    repeats : int, default 1000
+        Number of timed augmentation calls.
+    warmup : int, default 20
+        Number of untimed warmup calls to stabilize caches.
+
+    Returns
+    -------
+    dict
+        Metrics with keys:
+        - 'repeats': int, number of measured iterations
+        - 'total_seconds': float, total measured time
+        - 'avg_seconds': float, average time per image (seconds)
+        - 'avg_milliseconds': float, average time per image (ms)
+        - 'images_per_second': float, throughput
+    """
+    # Warmup (not timed): helps stabilize any lazy allocations/caches
+    for _ in range(max(0, warmup)):
+        _ = augment_image(img.copy())
+
+    # Timed runs
+    start = time.perf_counter()
+    for _ in range(repeats):
+        _ = augment_image(img.copy())
+    total = time.perf_counter() - start
+
+    avg_s = total / max(1, repeats)
+    metrics = {
+        "repeats": repeats,
+        "total_seconds": total,
+        "avg_seconds": avg_s,
+        "avg_milliseconds": avg_s * 1e3,
+        "images_per_second": 1.0 / avg_s if avg_s > 0 else float("inf"),
+    }
+    return metrics
+
+
 if __name__ == "__main__":
     # Example usage: update the path to your local test image.
     plot_augmentations_grid(image_path="test.png",
                             save_path="aug_grid.png")
+
+    img = Image.open(image_path="test.png").convert("RGB")
+    metrics = benchmark_augment(img, repeats=1000, warmup=20)
+
+    print("\nAugmentation Benchmark")
+    print("----------------------")
+    print(f"Image:              {"test.png"}")
+    print(f"Iterations:         {metrics['repeats']}")
+    print(f"Total time (s):     {metrics['total_seconds']:.4f}")
+    print(f"Avg / image (ms):   {metrics['avg_milliseconds']:.3f}")
+    print(f"Images / second:    {metrics['images_per_second']:.2f}\n")
