@@ -41,6 +41,9 @@ def rotate_image(
     """
     Rotate the image by a random angle within `angle_range`.
 
+    The image is rotated and then resized to fit within the original dimensions,
+    preventing the corners from being cut off.
+
     Parameters
     ----------
     img : PIL.Image.Image
@@ -48,29 +51,40 @@ def rotate_image(
     angle_range : tuple[float, float] or None
         (min_deg, max_deg). If None, rotation is skipped.
     fill : tuple[int, int, int]
-        Fill color for exposed areas after rotation. (Calculated from image borders)
+        Fill color for exposed areas after rotation.
 
     Returns
     -------
     PIL.Image.Image
-        Rotated image, cropped back to original size.
+        Rotated and resized image.
     """
     if not angle_range:
         return img
 
     w, h = img.size
-    margin = int(0.1 * max(w, h))
-    padded = TF.pad(img, [margin, margin, margin, margin], fill=fill)
-
     angle = random.uniform(angle_range[0], angle_range[1])
+
+    # Rotate the image and expand the canvas to fit the entire rotated image.
     rotated = TF.rotate(
-        padded,
+        img,
         angle=angle,
         interpolation=InterpolationMode.BILINEAR,
-        expand=False,
+        expand=True,  # Expand to fit the entire rotated image
         fill=fill,
     )
-    return TF.center_crop(rotated, [h, w])
+
+    # Create a new image with the original dimensions and the specified background color.
+    new_img = Image.new("RGB", (w, h), fill)
+    
+    # Resize the rotated image to fit within the original dimensions while maintaining aspect ratio.
+    rotated.thumbnail((w, h), Image.Resampling.LANCZOS)
+
+    # Paste the resized, rotated image onto the center of the new background.
+    paste_x = (w - rotated.width) // 2
+    paste_y = (h - rotated.height) // 2
+    new_img.paste(rotated, (paste_x, paste_y))
+
+    return new_img
 
 
 def shear_image(
