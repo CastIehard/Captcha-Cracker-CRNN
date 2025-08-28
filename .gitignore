@@ -3,6 +3,7 @@ UTN-CV25-Captcha-Dataset/*
 UTN-CV25-Captcha-Dataset
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.DS_Store
 *.py[codz]
 *$py.class
 
