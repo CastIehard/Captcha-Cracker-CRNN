@@ -3,3 +3,6 @@ torchvision
 Pillow
 numpy
 tqdm
+pyyaml
+matplotlib
+python-Levenshtein
