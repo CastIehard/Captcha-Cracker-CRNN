@@ -1,0 +1,70 @@
+# ==============================
+# Dataset paths
+# ==============================
+
+train_root: data/part2/train
+val_root: data/part2/val
+test_root: data/part2/test
+label_path: data/part2/train/labels.json
+original_image_dir: data/part2/train/images
+
+# ==============================
+# Tuning settings for Optuna
+# ==============================
+
+batch_size: [4, 8]                
+learning_rate: [1e-4, 5e-3]       
+epochs: [3, 5, 7]                 
+optimizer: ["adam", "adamw"]
+num_trials: 10                   
+seed: 42
+ctc_blank_index: 0
+
+# ==============================
+# Augmentation scenarios
+# ==============================
+
+augmentation_scenarios:
+  - name: aug_type_A
+    params:
+      angle_range: [-15, 15]
+      shear_range: [-10, 10]
+      brightness_range: [0.8, 1.2]
+      contrast_range: [0.8, 1.2]
+      noise_std: [0.01, 0.05]
+      blur_probability: 0.3
+      blur_radius: [0.5, 2.0]
+      lines_probability: 0.1
+      line_count: [1, 3]
+      line_thickness: [1, 4]
+
+  - name: aug_type_B
+    params:
+      angle_range: [-8, 8]
+      shear_range: [-6, 6]
+      brightness_range: [0.85, 1.15]
+      contrast_range: [0.85, 1.15]
+      noise_std: [0.03, 0.08]
+      blur_probability: 0.5
+      blur_radius: [1.0, 3.0]
+      lines_probability: 0.2
+      line_count: [2, 4]
+      line_thickness: [2, 5]
+
+
+# ==============================
+# Output directories
+# ==============================
+
+output_base_dir: outputs/tuning_mid/
+
+
+# ==============================
+# Post-analysis
+# ==============================
+
+analysis_scripts:
+  - plot_curves
+  - compare_trials
+  - plot_charset_freq
+  - plot_prediction_dist
