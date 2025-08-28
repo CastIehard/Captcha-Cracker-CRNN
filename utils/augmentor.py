@@ -34,6 +34,10 @@ def apply_augmentation_to_folder(input_dir, output_dir, params):
 
         # Check if output file exists and is valid
         if os.path.exists(out_path):
+            
+            continue # remove this line if you want to verify existing files
+
+
             try:
                 with Image.open(out_path) as im:
                     im.verify()  # Try to verify output image
