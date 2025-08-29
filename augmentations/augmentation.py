@@ -327,6 +327,71 @@ def add_lines(
         draw.line([(x0, y0), (x1, y1)], fill=line_color, width=thickness)
     return out
 
+def remove_background(img: Image.Image, bg_color: Tuple[int, int, int], threshold: int = 50) -> Image.Image:
+    """
+    Make pixels similar to `bg_color` white, based on a distance threshold.
+    This vectorized version is significantly faster than iterating over pixels.
+
+    Parameters
+    ----------
+    img : PIL.Image.Image
+        Input image.
+    bg_color : tuple[int, int, int]
+        Reference background color (R, G, B).
+    threshold : int
+        Color distance threshold. Pixels with a Euclidean distance to `bg_color`
+        less than this will be considered background.
+
+    Returns
+    -------
+    PIL.Image.Image
+        Image with background turned white.
+    """
+    # Convert image to numpy array for vectorized operations
+    img_arr = np.array(img.convert("RGB"))
+    
+    # Calculate Euclidean distance for all pixels at once
+    distances = np.linalg.norm(img_arr - np.array(bg_color), axis=2)
+    
+    # Create a mask for background pixels
+    bg_mask = distances < threshold
+    
+    # Create a new RGBA image array to handle transparency
+    img_rgba = np.array(img.convert("RGBA"))
+    
+    # Set background pixels to white and opaque
+    img_rgba[bg_mask] = [255, 255, 255, 255]
+    
+    # Convert back to PIL Image
+    return Image.fromarray(img_rgba)
+
+
+def make_glyphs_black(img: Image.Image) -> Image.Image:
+    """
+    Convert all non-white pixels in the image to black using vectorization.
+
+    Parameters
+    ----------
+    img : PIL.Image.Image
+        Input image, expected to have a white background.
+
+    Returns
+    -------
+    PIL.Image.Image
+        Image with non-white pixels turned black.
+    """
+    # Convert to a NumPy array for fast processing
+    img_arr = np.array(img.convert("RGBA"))
+    
+    # Create a mask for non-white pixels (where any of R, G, B is not 255)
+    rgb = img_arr[:, :, :3]
+    is_not_white = np.any(rgb != [255, 255, 255], axis=2)
+    
+    # Set the RGB values of non-white pixels to black (0, 0, 0)
+    img_arr[is_not_white, :3] = 0
+    
+    # Convert back to a PIL Image
+    return Image.fromarray(img_arr)
 
 # ---------------------------------------------------------------------
 # Public API
@@ -334,6 +399,8 @@ def add_lines(
 
 def augment_image(
     img: Image.Image,
+    do_remove_background: bool = True,
+    do_make_glyphs_black: bool = True,
     angle_range: Optional[Tuple[float, float]] = (-15, 15),
     shear_range: Optional[Tuple[float, float]] = (-10, 10),
     target_size: Optional[Tuple[int, int]] = (640, 160),
@@ -386,6 +453,15 @@ def augment_image(
     """
     # Estimate background color for fill operations
     background_color = estimate_bg_color(img)
+    if do_remove_background:
+        img = remove_background(img, background_color)
+        background_color = (255, 255, 255)
+
+    if do_make_glyphs_black:
+        img = make_glyphs_black(img)
+
+    # Convert back to RGB before geometric transforms that use a 3-channel fill color
+    img = img.convert("RGB")
 
     # Apply geometric transformations
     img = rotate_image(img, angle_range, background_color)

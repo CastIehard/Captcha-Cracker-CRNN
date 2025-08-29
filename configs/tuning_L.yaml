@@ -27,6 +27,8 @@ ctc_blank_index: 0
 augmentation_scenarios:
   - name: aug_type_A  # Default augmentation settings
     params:
+      do_remove_background: True
+      do_make_glyphs_black: True
       angle_range: [-15, 15]
       shear_range: [-10, 10]
       brightness_range: [0.8, 1.2]
@@ -40,6 +42,8 @@ augmentation_scenarios:
 
   - name: aug_type_B  # Stronger blur and noise, moderate rotation/shear
     params:
+      do_remove_background: True
+      do_make_glyphs_black: True
       angle_range: [-8, 8]
       shear_range: [-6, 6]
       brightness_range: [0.85, 1.15]
@@ -53,6 +57,8 @@ augmentation_scenarios:
 
   - name: aug_type_C  # Heavy geometric distortion, low noise
     params:
+      do_remove_background: True
+      do_make_glyphs_black: True
       angle_range: [-20, 20]
       shear_range: [-15, 15]
       brightness_range: [0.75, 1.25]
