@@ -27,6 +27,8 @@ ctc_blank_index: 0
 augmentation_scenarios:
   - name: aug_default  # Default augmentation settings
     params:
+      do_remove_background: True
+      do_make_glyphs_black: True
       angle_range: [-15, 15]
       shear_range: [-10, 10]
       brightness_range: [0.8, 1.2]
