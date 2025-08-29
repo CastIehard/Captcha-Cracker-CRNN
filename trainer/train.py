@@ -53,11 +53,16 @@ def train(
     os.makedirs(os.path.dirname(history_path), exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # Initialize training history
-    history = {
-        "train_loss": [],
-        "val_ler": []
-    }
+    # Load existing history if resuming
+    if os.path.exists(history_path):
+        with open(history_path, 'r') as f:
+            history = json.load(f)
+        print(f" Resuming from existing history: {history_path}")
+    else:
+        history = { # initialize empty history
+            "train_loss": [],
+            "val_ler": []
+        }
 
     # Load existing history if resuming
     if os.path.exists(history_path):
