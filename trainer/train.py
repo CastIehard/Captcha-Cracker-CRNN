@@ -59,79 +59,74 @@ def train(
         "val_ler": []
     }
 
-    # Start training over epochs
+    # Load existing history if resuming
+    if os.path.exists(history_path):
+        try:
+            with open(history_path, "r") as f:
+                history = json.load(f)
+        except Exception:
+            print(f" Failed to load existing history from {history_path}, starting fresh.")
+
+    # Load previous checkpoint if resuming
+    if start_epoch > 0:
+        prev_ckpt_path = os.path.join(checkpoint_dir, f"epoch_{start_epoch}.pth")
+        if os.path.exists(prev_ckpt_path):
+            print(f"Loading previous checkpoint from {prev_ckpt_path} to resume from epoch {start_epoch+1}")
+            checkpoint = torch.load(prev_ckpt_path, map_location=device)
+            model.load_state_dict(checkpoint["model_state"])
+            optimizer.load_state_dict(checkpoint["optimizer_state"])
+        else:
+            print(f" Warning: Checkpoint for epoch {start_epoch} not found. Starting fresh.")
+
+    # Start training from specified epoch
     for epoch in range(start_epoch, num_epochs):
         ckpt_path = os.path.join(checkpoint_dir, f"epoch_{epoch+1}.pth")
-        # Skip epoch if checkpoint already exists
+
+        # If checkpoint exists, skip training and just record from it
         if os.path.exists(ckpt_path):
             print(f" Skipping epoch {epoch+1}, loading existing checkpoint from {ckpt_path}")
-            checkpoint = torch.load(ckpt_path, map_location=device) 
-            model.load_state_dict(checkpoint["model_state"]) 
+            checkpoint = torch.load(ckpt_path, map_location=device)
+            model.load_state_dict(checkpoint["model_state"])
             optimizer.load_state_dict(checkpoint["optimizer_state"])
 
-            # Optional: If you saved these in the checkpoint
+            # Use logged metrics if available
             train_loss = checkpoint.get("train_loss", 0.0)
             val_ler = checkpoint.get("val_ler", 1.0)
-
             history["train_loss"].append(train_loss)
             history["val_ler"].append(val_ler)
-
             continue
 
         model.train()
         total_loss, steps = 0.0, 0
 
-        # Initialize progress bar
         pbar = tqdm(train_loader, total=len(train_loader),
                     desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
 
         for X, targets, in_lens, tar_lens in pbar:
-            # Move batch data to device
             X = X.to(device, non_blocking=True)
             targets = targets.to(device, non_blocking=True)
             in_lens = in_lens.to(device, non_blocking=True)
             tar_lens = tar_lens.to(device, non_blocking=True)
 
-            # Forward pass
-            logp = model(X)  # Output: (T, B, C)
-
-            # Compute loss
+            logp = model(X)
             loss = crit(logp, targets, in_lens, tar_lens)
 
-            # Backpropagation
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
-
-            # Clip gradients for stability
             nn.utils.clip_grad_norm_(model.parameters(), 5.0)
-
-            # Update weights
             optimizer.step()
-            
-            # Accumulate loss for reporting
+
             total_loss += float(loss)
             steps += 1
-
-            # Update progress bar
             pbar.set_postfix(loss=f"{loss.item():.4f}")
 
-        # Validation phase using Levenshtein Error Rate (LER) 
-        val_ler = evaluate_ler(
-            model=model,
-            dataloader=val_loader,
-            device=device,
-            idx2char=idx2char,
-            blank=blank
-        )
-
-        # Average training loss for this epoch
+        val_ler = evaluate_ler(model, val_loader, device, idx2char, blank)
         avg_loss = total_loss / max(steps, 1)
         history["train_loss"].append(avg_loss)
         history["val_ler"].append(val_ler)
 
         print(f"Epoch {epoch+1}/{num_epochs} - train_loss: {avg_loss:.4f}  val_LER: {val_ler:.4f}")
 
-        # Save checkpoint for this epoch
         checkpoint = {
             "model_state": model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
@@ -142,7 +137,7 @@ def train(
         torch.save(checkpoint, ckpt_path)
         print(f"Checkpoint saved at: {ckpt_path}")
 
-    # Save final model checkpoint after all epoch
+    # Save final model checkpoint
     final_ckpt = {
         "model_state": model.state_dict(),
         "optimizer_state": optimizer.state_dict(),
