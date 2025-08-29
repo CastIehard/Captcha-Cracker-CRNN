@@ -6,7 +6,6 @@ __pycache__/
 .DS_Store
 *.py[codz]
 *$py.class
-
 # C extensions
 *.so
 

@@ -1,10 +1,11 @@
 import os
-import time
 import yaml
+import shutil
 import torch
 import optuna
 import subprocess
-from torch.utils.data import DataLoader
+from optuna.trial import TrialState
+from torch.utils.data import DataLoader, Subset
 
 from models.crnn import CRNN
 from trainer.train import train
@@ -12,12 +13,12 @@ from trainer.evaluator import evaluate_ler, make_part2_predictions_json
 from trainer.dataloader import CaptchaDataset, collate
 from utils.seed import set_seed
 from utils.parser import load_charset_from_labels
-from utils.checkpoint import save_checkpoint
-from utils.augmentor import apply_augmentation_to_folder
 from utils.logger import Logger
+from utils.augmentor import apply_augmentation_to_folder
 
 
 def build_optimizer(name, model_params, lr):
+    # Choose optimizer based on name
     name = name.lower()
     if name == "adam":
         return torch.optim.Adam(model_params, lr=lr)
@@ -29,13 +30,23 @@ def build_optimizer(name, model_params, lr):
         raise ValueError(f"Unsupported optimizer: {name}")
 
 
+def get_latest_epoch(ckpt_dir):
+    # Returns the highest checkpoint epoch number from the checkpoint directory
+    if not os.path.exists(ckpt_dir):
+        return 0
+    files = [f for f in os.listdir(ckpt_dir) if f.startswith("epoch_") and f.endswith(".pth")]
+    if not files:
+        return 0
+    return max(int(f.replace("epoch_", "").replace(".pth", "")) for f in files)
+
+
 def run_from_config(config_path):
+    # Load config YAML
     with open(config_path, "r") as f:
         cfg = yaml.safe_load(f)
 
+    # Set up output directory paths
     output_base = cfg.get("output_base_dir", "outputs/tuning_optuna")
-
-    # Setup output directories
     cfg["checkpoint_dir"] = os.path.join(output_base, "checkpoints")
     cfg["final_model_dir"] = os.path.join(output_base, "models")
     cfg["history_dir"] = os.path.join(output_base, "logs")
@@ -43,6 +54,7 @@ def run_from_config(config_path):
     cfg["analysis_dir"] = os.path.join(output_base, "analysis")
     cfg["prediction_dir"] = os.path.join(output_base, "predictions")
 
+    # Create required folders if they don't exist
     for d in [cfg["checkpoint_dir"], cfg["final_model_dir"], cfg["history_dir"],
               cfg["analysis_dir"], cfg["prediction_dir"]]:
         os.makedirs(d, exist_ok=True)
@@ -53,6 +65,7 @@ def run_from_config(config_path):
     set_seed(cfg["seed"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # Load charset from label file
     char2idx, idx2char, charset = load_charset_from_labels(cfg["label_path"])
 
     scenarios = cfg.get("augmentation_scenarios", [{"name": "default", "params": None}])
@@ -65,7 +78,7 @@ def run_from_config(config_path):
         print(f"\nStarting augmentation scenario: {aug_name}")
         logger.section(f"Scenario: {aug_name}")
 
-        # Apply augmentation if needed
+        # Augmentation
         if aug_params:
             aug_image_dir = os.path.join(cfg["train_root"], f"images_{aug_name}")
             os.makedirs(aug_image_dir, exist_ok=True)
@@ -77,19 +90,61 @@ def run_from_config(config_path):
         train_ds = CaptchaDataset(cfg["train_root"], char2idx, image_subdir=aug_subdir)
         val_ds = CaptchaDataset(cfg["val_root"], char2idx)
 
+        # Optional: restrict dataset size for debugging
+        #train_ds = Subset(train_ds, list(range(min(len(train_ds), 1000))))
+        #val_ds = Subset(val_ds, list(range(min(len(val_ds), 1000))))
+
+        # Set up or resume Optuna study
+        study = optuna.create_study(
+            direction="minimize",
+            study_name=f"study_{aug_name}",
+            storage="sqlite:///optuna_study.db",
+            load_if_exists=True
+        )
+
+        # Manually assign consistent trial numbers
+        trial_id_map = {}
+        existing_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+        for i, trial in enumerate(existing_trials):
+            trial_id_map[trial._trial_id] = i
+
+        current_trial_index = len(trial_id_map)
+
         def objective(trial):
+            nonlocal current_trial_index
+
+            # Ensure consistent trial folder names by manual tracking
+            trial_id = trial._trial_id
+            if trial_id not in trial_id_map:
+                trial_id_map[trial_id] = current_trial_index
+                current_trial_index += 1
+            trial_number = trial_id_map[trial_id]
+            trial_name = f"{aug_name}_trial_{trial_number + 1}"
+
+            # hyperparameters
             batch_size = trial.suggest_categorical("batch_size", cfg["batch_size"])
-            lr_range = [float(x) for x in cfg["learning_rate"]]
-            lr = trial.suggest_float("lr", min(lr_range), max(lr_range), log=True)
+            lr = trial.suggest_float("lr", float(cfg["learning_rate"][0]), float(cfg["learning_rate"][1]), log=True)
             epochs = trial.suggest_categorical("epochs", cfg["epochs"])
             opt_name = trial.suggest_categorical("optimizer", cfg["optimizer"])
 
-            trial_name = f"{aug_name}_trial_{trial.number + 1}"
-            logger.section(f"Trial {trial.number + 1}: {trial_name}")
+            logger.section(f"Trial {trial_number + 1}: {trial_name}")
             logger.log(f"batch_size={batch_size}, lr={lr}, epochs={epochs}, optimizer={opt_name}")
 
-            train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, collate_fn=collate)
-            val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, collate_fn=collate)
+            # Build dataloaders
+            train_loader = DataLoader(
+                train_ds, 
+                batch_size=batch_size, 
+                shuffle=True, 
+                collate_fn=collate,
+                num_workers=12,
+                )
+            val_loader = DataLoader(
+                val_ds, 
+                batch_size=batch_size, 
+                shuffle=False, 
+                collate_fn=collate,
+                num_workers=10
+                )
 
             model = CRNN(num_classes=1 + len(charset)).to(device)
             optimizer = build_optimizer(opt_name, model.parameters(), lr)
@@ -101,7 +156,9 @@ def run_from_config(config_path):
             os.makedirs(ckpt_dir, exist_ok=True)
 
             model_path = os.path.join(model_dir, "final_model.pth")
+            start_epoch = get_latest_epoch(ckpt_dir)
 
+            # Train the model
             train(
                 model=model,
                 train_loader=train_loader,
@@ -114,31 +171,34 @@ def run_from_config(config_path):
                 save_path=model_path,
                 checkpoint_dir=ckpt_dir,
                 history_path=hist_path,
-                start_epoch=0
+                start_epoch=start_epoch
             )
 
+            # Evaluate validation LER
             val_ler = evaluate_ler(model, val_loader, device, idx2char, blank=cfg["ctc_blank_index"])
             logger.log(f"Val LER: {val_ler:.4f}")
-
-            # Save model path in user attributes
             trial.set_user_attr("model_path", model_path)
             trial.set_user_attr("val_ler", val_ler)
 
             return val_ler
 
-        # Run tuning
-        study = optuna.create_study(direction="minimize")
-        study.optimize(objective, n_trials=cfg.get("num_trials", 10))
+        # Resume only remaining trials
+        remaining_trials = cfg.get("num_trials", 10) - len(existing_trials)
+        if remaining_trials > 0:
+            print(f" Resuming study: {study.study_name} — {len(existing_trials)} completed, {remaining_trials} remaining")
+            study.optimize(objective, n_trials=remaining_trials)
+        else:
+            print(f" Study already completed: {len(existing_trials)}/{cfg.get('num_trials', 10)} trials.")
 
+        # Record best model if LER improved
         best_trial = study.best_trial
         trial_model_path = best_trial.user_attrs["model_path"]
         trial_ler = best_trial.user_attrs["val_ler"]
-
         if trial_ler < best_ler:
             best_ler = trial_ler
             best_model_path = trial_model_path
 
-    # Run analysis
+    # Run visualization/analysis scripts if specified
     visualizations = cfg.get("analysis_scripts", [])
     if visualizations:
         logger.section("Running Analysis Scripts")
@@ -151,7 +211,7 @@ def run_from_config(config_path):
         except subprocess.CalledProcessError as e:
             logger.log(f"Analysis failed: {e}")
 
-    # Predict test set
+    # Generate predictions using the best model
     print("\nGenerating predictions on test set...")
     os.makedirs(cfg["prediction_dir"], exist_ok=True)
     pred_json_path = os.path.join(

@@ -6,3 +6,4 @@ tqdm
 pyyaml
 matplotlib
 python-Levenshtein
+optuna
