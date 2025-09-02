@@ -415,8 +415,8 @@ def remove_background(img: Image.Image, bg_color: Tuple[int, int, int], threshol
     # Set background pixels to white and opaque
     img_rgba[bg_mask] = [255, 255, 255, 255]
     
-    # Convert back to PIL Image
-    return Image.fromarray(img_rgba)
+    # Convert back to PIL Image and ensure RGB mode
+    return Image.fromarray(img_rgba).convert("RGB")
 
 
 def make_glyphs_black(img: Image.Image) -> Image.Image:
@@ -443,8 +443,8 @@ def make_glyphs_black(img: Image.Image) -> Image.Image:
     # Set the RGB values of non-white pixels to black (0, 0, 0)
     img_arr[is_not_white, :3] = 0
     
-    # Convert back to a PIL Image
-    return Image.fromarray(img_arr)
+    # Convert back to a PIL Image and ensure RGB mode
+    return Image.fromarray(img_arr).convert("RGB")
 
 # ---------------------------------------------------------------------
 # Public API
