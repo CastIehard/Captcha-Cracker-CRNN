@@ -1,0 +1,57 @@
+# ==============================
+# Dataset paths
+# ==============================
+
+train_root: data/part2/train
+val_root: data/part2/val
+test_root: data/part2/test
+label_path: data/part2/train/labels.json
+original_image_dir: data/part2/train/images
+
+# ==============================
+# Tuning settings for Optuna
+# ==============================
+
+batch_size: [8, 16, 32]
+learning_rate: [1e-5, 3e-4]
+epochs: [70]
+optimizer: ["adamw", "adam"]
+num_trials: 40
+seed: 42
+ctc_blank_index: 0
+
+# ==============================
+# Augmentation scenarios
+# ==============================
+
+augmentation_scenarios:
+  - name: aug_default  # Default augmentation settings
+    params:
+      do_remove_background: False
+      do_make_glyphs_black: False
+      angle_range: [-15, 15]
+      shear_range: [-10, 10]
+      brightness_range: [0.8, 1.2]
+      contrast_range: [0.8, 1.2]
+      noise_std: [0.01, 0.05]
+      blur_probability: 0.3
+      blur_radius: [0.5, 2.0]
+      lines_probability: 0.1
+      line_count: [1, 3]
+      line_thickness: [1, 4]
+
+# ==============================
+# Output directories
+# ==============================
+
+output_base_dir: outputs/tuning_resnet50/
+
+# ==============================
+# Post-analysis
+# ==============================
+
+analysis_scripts:
+  - plot_curves
+  - compare_trials
+  - plot_charset_freq
+  - plot_prediction_dist
