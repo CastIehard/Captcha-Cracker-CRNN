@@ -56,7 +56,7 @@ class CaptchaDataset(Dataset):
         return x, y
 
 
-def collate(batch, stride=4):
+def collate(batch, stride=32):
     """
     Custom collate function for DataLoader to handle variable-width CAPTCHA images.
 
