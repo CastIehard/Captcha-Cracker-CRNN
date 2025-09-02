@@ -317,15 +317,68 @@ def add_lines(
     if line_thickness:
         thickness = random.randint(line_thickness[0], line_thickness[1])
 
-    # Choose a dark-ish line color relative to the estimated background.
-    bg = estimate_bg_color(out)
-    line_color = tuple(max(0, c - random.randint(40, 80)) for c in bg)
+    # Always use black for line color
+    line_color = (0, 0, 0)
 
     for _ in range(n):
         x0, y0 = random.randint(0, w - 1), random.randint(0, h - 1)
         x1, y1 = random.randint(0, w - 1), random.randint(0, h - 1)
         draw.line([(x0, y0), (x1, y1)], fill=line_color, width=thickness)
     return out
+
+
+def add_points(
+    img: Image.Image,
+    probability: float,
+    point_count: Optional[Tuple[int, int]],
+    point_size: Optional[Tuple[int, int]],
+) -> Image.Image:
+    """
+    Draw random points (circles) on the image with given probability.
+
+    Parameters
+    ----------
+    img : PIL.Image.Image
+        Input image.
+    probability : float
+        Probability in [0, 1] of adding points.
+    point_count : tuple[int, int] or None
+        (min_count, max_count) range for number of points. If None, skip drawing.
+    point_size : tuple[int, int] or None
+        (min_radius, max_radius) range for point radius in pixels. If None, uses 1.
+
+    Returns
+    -------
+    PIL.Image.Image
+        Image with optional random points.
+    """
+    if (random.random() >= probability) or (not point_count):
+        return img
+
+    out = img.copy()
+    draw = ImageDraw.Draw(out)
+    w, h = out.size
+    n = random.randint(point_count[0], point_count[1])
+
+    for _ in range(n):
+        # Choose a random point color for each point
+        point_color = tuple(random.randint(0, 255) for _ in range(3))
+        
+        # Random position for the point center
+        x = random.randint(0, w - 1)
+        y = random.randint(0, h - 1)
+        
+        # Random radius for the point
+        radius = 1
+        if point_size:
+            radius = random.randint(point_size[0], point_size[1])
+        
+        # Draw a filled circle (point)
+        bbox = [x - radius, y - radius, x + radius, y + radius]
+        draw.ellipse(bbox, fill=point_color)
+
+    return out
+
 
 def remove_background(img: Image.Image, bg_color: Tuple[int, int, int], threshold: int = 50) -> Image.Image:
     """
@@ -399,8 +452,8 @@ def make_glyphs_black(img: Image.Image) -> Image.Image:
 
 def augment_image(
     img: Image.Image,
-    do_remove_background: bool = True,
-    do_make_glyphs_black: bool = True,
+    do_remove_background: bool = False,
+    do_make_glyphs_black: bool = False,
     angle_range: Optional[Tuple[float, float]] = (-15, 15),
     shear_range: Optional[Tuple[float, float]] = (-10, 10),
     target_size: Optional[Tuple[int, int]] = (640, 160),
@@ -413,6 +466,9 @@ def augment_image(
     lines_probability: float = 0.1,
     line_count: Optional[Tuple[int, int]] = (1, 3),
     line_thickness: Optional[Tuple[int, int]] = (1, 4),
+    points_probability: float = 0.2,
+    point_count: Optional[Tuple[int, int]] = (1, 5),
+    point_size: Optional[Tuple[int, int]] = (1, 3),
 ) -> Image.Image:
     """
     Apply comprehensive augmentation pipeline to an image.
@@ -445,6 +501,12 @@ def augment_image(
         Number of lines to add.
     line_thickness : tuple[int, int] or None
         Line thickness range.
+    points_probability : float
+        Probability of adding random points.
+    point_count : tuple[int, int] or None
+        Number of points to add.
+    point_size : tuple[int, int] or None
+        Point radius range.
 
     Returns
     -------
@@ -479,5 +541,6 @@ def augment_image(
     
     # Add distractor elements
     img = add_lines(img, lines_probability, line_count, line_thickness)
+    img = add_points(img, points_probability, point_count, point_size)
     
     return img
