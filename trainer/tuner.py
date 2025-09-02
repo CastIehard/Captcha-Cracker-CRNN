@@ -136,7 +136,7 @@ def run_from_config(config_path):
                 batch_size=batch_size, 
                 shuffle=True, 
                 collate_fn=collate,
-                num_workers=12,
+                num_workers=10,
                 )
             val_loader = DataLoader(
                 val_ds, 

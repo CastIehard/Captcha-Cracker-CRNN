@@ -3,7 +3,7 @@ augmentation_scenarios:
     params:
       do_remove_background: False
       do_make_glyphs_black: False
-      angle_range: [-60, 160]
+      angle_range: [-60, 60]
       shear_range: [-5, 5]
       brightness_range: [0.8, 1.2]
       contrast_range: [0.8, 1.2]
