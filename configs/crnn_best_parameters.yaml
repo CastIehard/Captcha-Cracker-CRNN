@@ -13,7 +13,7 @@ original_image_dir: data/part2/train/images
 # ==============================
 
 batch_size: [16]                  
-learning_rate: [2e-4, 4e-4]            
+learning_rate: [0.0003]            
 epochs: [50]                           
 optimizer: ["adamw"]                    
 num_trials: 4                          
