@@ -9,7 +9,7 @@ label_path: data/part2/train/labels.json
 original_image_dir: data/part2/train/images
 
 # ==============================
-# Tuning settings for Optuna (fixed parameters)
+# Tuning settings
 # ==============================
 
 batch_size: [16]                  

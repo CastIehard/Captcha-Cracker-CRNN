@@ -1,10 +1,9 @@
 import os
 import yaml
-import shutil
 import torch
-import optuna
 import subprocess
-from optuna.trial import TrialState
+import random
+import json
 from torch.utils.data import DataLoader, Subset
 
 from models.crnn import CRNN
@@ -30,6 +29,95 @@ def build_optimizer(name, model_params, lr):
         raise ValueError(f"Unsupported optimizer: {name}")
 
 
+def sample_random_params(cfg, existing_params=None):
+    """Sample random parameters from config ranges, avoiding duplicates"""
+    if existing_params is None:
+        existing_params = set()
+    
+    max_attempts = 1000
+    for _ in range(max_attempts):
+        # Sample parameters
+        batch_size = random.choice(cfg["batch_size"])
+        
+        # Handle learning rate range or list
+        if len(cfg["learning_rate"]) == 2 and isinstance(cfg["learning_rate"][0], (int, float)):
+            # Range: sample log-uniform between min and max
+            lr_min, lr_max = cfg["learning_rate"]
+            lr = random.uniform(lr_min, lr_max)
+        else:
+            # List: sample from choices
+            lr = random.choice(cfg["learning_rate"])
+            
+        epochs = random.choice(cfg["epochs"])
+        optimizer = random.choice(cfg["optimizer"])
+        
+        # Create parameter tuple for duplicate checking
+        param_tuple = (batch_size, lr, epochs, optimizer)
+        
+        if param_tuple not in existing_params:
+            return {
+                "batch_size": batch_size,
+                "learning_rate": lr,
+                "epochs": epochs,
+                "optimizer": optimizer
+            }, param_tuple
+    
+    # If we can't find unique params after many attempts, just return a random one
+    return {
+        "batch_size": batch_size,
+        "learning_rate": lr,
+        "epochs": epochs,
+        "optimizer": optimizer
+    }, param_tuple
+
+
+def load_existing_trials(trial_log_path):
+    """Load existing trial parameters from log file"""
+    existing_params = set()
+    if os.path.exists(trial_log_path):
+        try:
+            with open(trial_log_path, 'r') as f:
+                trials = json.load(f)
+                for trial in trials:
+                    params = trial['params']
+                    param_tuple = (
+                        params['batch_size'],
+                        params['learning_rate'],
+                        params['epochs'],
+                        params['optimizer']
+                    )
+                    existing_params.add(param_tuple)
+        except (json.JSONDecodeError, KeyError):
+            pass
+    return existing_params
+
+
+def save_trial_result(trial_log_path, trial_num, params, val_ler, model_path):
+    """Save trial result to log file"""
+    trial_data = {
+        "trial": trial_num,
+        "params": params,
+        "val_ler": val_ler,
+        "model_path": model_path
+    }
+    
+    # Load existing trials
+    trials = []
+    if os.path.exists(trial_log_path):
+        try:
+            with open(trial_log_path, 'r') as f:
+                trials = json.load(f)
+        except json.JSONDecodeError:
+            trials = []
+    
+    # Add new trial
+    trials.append(trial_data)
+    
+    # Save back
+    with open(trial_log_path, 'w') as f:
+        json.dump(trials, f, indent=2)
+
+
 def get_latest_epoch(ckpt_dir):
     # Returns the highest checkpoint epoch number from the checkpoint directory
     if not os.path.exists(ckpt_dir):
@@ -46,7 +134,7 @@ def run_from_config(config_path):
         cfg = yaml.safe_load(f)
 
     # Set up output directory paths
-    output_base = cfg.get("output_base_dir", "outputs/tuning_optuna")
+    output_base = cfg.get("output_base_dir", "outputs/training")
     cfg["checkpoint_dir"] = os.path.join(output_base, "checkpoints")
     cfg["final_model_dir"] = os.path.join(output_base, "models")
     cfg["history_dir"] = os.path.join(output_base, "logs")
@@ -60,7 +148,7 @@ def run_from_config(config_path):
         os.makedirs(d, exist_ok=True)
 
     logger = Logger(cfg["log_file_path"])
-    logger.section(f"Optuna Tuning Started from {config_path}")
+    logger.section(f"Training Started from {config_path}")
 
     set_seed(cfg["seed"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -90,46 +178,32 @@ def run_from_config(config_path):
         train_ds = CaptchaDataset(cfg["train_root"], char2idx, image_subdir=aug_subdir)
         val_ds = CaptchaDataset(cfg["val_root"], char2idx)
 
-        # Optional: restrict dataset size for debugging
-        #train_ds = Subset(train_ds, list(range(min(len(train_ds), 1000))))
-        #val_ds = Subset(val_ds, list(range(min(len(val_ds), 1000))))
-
-        # Set up or resume Optuna study
-        study = optuna.create_study(
-            direction="minimize",
-            study_name=f"study_{aug_name}",
-            storage="sqlite:///optuna_study.db",
-            load_if_exists=True
-        )
-
-        # Manually assign consistent trial numbers
-        trial_id_map = {}
-        existing_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-        for i, trial in enumerate(existing_trials):
-            trial_id_map[trial._trial_id] = i
-
-        current_trial_index = len(trial_id_map)
-
-        def objective(trial):
-            nonlocal current_trial_index
-
-            # Ensure consistent trial folder names by manual tracking
-            trial_id = trial._trial_id
-            if trial_id not in trial_id_map:
-                trial_id_map[trial_id] = current_trial_index
-                current_trial_index += 1
-            trial_number = trial_id_map[trial_id]
-            trial_name = f"{aug_name}_trial_{trial_number + 1}"
-
-            # hyperparameters
-            batch_size = trial.suggest_categorical("batch_size", cfg["batch_size"])
-            lr = trial.suggest_float("lr", float(cfg["learning_rate"][0]), float(cfg["learning_rate"][1]), log=True)
-            epochs = trial.suggest_categorical("epochs", cfg["epochs"])
-            opt_name = trial.suggest_categorical("optimizer", cfg["optimizer"])
-
-            logger.section(f"Trial {trial_number + 1}: {trial_name}")
+        # Set up trial tracking
+        trial_log_path = os.path.join(cfg["history_dir"], f"{aug_name}_trials.json")
+        existing_params = load_existing_trials(trial_log_path)
+        num_trials = cfg.get("num_trials", 10)
+        
+        print(f"Running {num_trials} trials for scenario: {aug_name}")
+        print(f"Found {len(existing_params)} existing trials")
+        
+        # Run trials
+        for trial_num in range(1, num_trials + 1):
+            print(f"\n--- Trial {trial_num}/{num_trials} ---")
+            
+            # Sample random parameters
+            params, param_tuple = sample_random_params(cfg, existing_params)
+            existing_params.add(param_tuple)
+            
+            batch_size = params["batch_size"]
+            lr = params["learning_rate"]
+            epochs = params["epochs"]
+            opt_name = params["optimizer"]
+            
+            trial_name = f"{aug_name}_trial_{trial_num}"
+            
+            logger.section(f"Trial {trial_num}: {trial_name}")
             logger.log(f"batch_size={batch_size}, lr={lr}, epochs={epochs}, optimizer={opt_name}")
-
+            
             # Build dataloaders
             train_loader = DataLoader(
                 train_ds, 
@@ -177,26 +251,15 @@ def run_from_config(config_path):
             # Evaluate validation LER
             val_ler = evaluate_ler(model, val_loader, device, idx2char, blank=cfg["ctc_blank_index"])
             logger.log(f"Val LER: {val_ler:.4f}")
-            trial.set_user_attr("model_path", model_path)
-            trial.set_user_attr("val_ler", val_ler)
-
-            return val_ler
-
-        # Resume only remaining trials
-        remaining_trials = cfg.get("num_trials", 10) - len(existing_trials)
-        if remaining_trials > 0:
-            print(f" Resuming study: {study.study_name} — {len(existing_trials)} completed, {remaining_trials} remaining")
-            study.optimize(objective, n_trials=remaining_trials)
-        else:
-            print(f" Study already completed: {len(existing_trials)}/{cfg.get('num_trials', 10)} trials.")
-
-        # Record best model if LER improved
-        best_trial = study.best_trial
-        trial_model_path = best_trial.user_attrs["model_path"]
-        trial_ler = best_trial.user_attrs["val_ler"]
-        if trial_ler < best_ler:
-            best_ler = trial_ler
-            best_model_path = trial_model_path
+            
+            # Save trial result
+            save_trial_result(trial_log_path, trial_num, params, val_ler, model_path)
+            
+            # Update best model if this trial performed better
+            if val_ler < best_ler:
+                best_ler = val_ler
+                best_model_path = model_path
+                print(f"New best LER: {val_ler:.4f}")
 
     # Run visualization/analysis scripts if specified
     visualizations = cfg.get("analysis_scripts", [])
@@ -234,3 +297,6 @@ def run_from_config(config_path):
     )
 
     print(f"Predictions saved to {pred_json_path}")
+    logger.log(f"Training completed. Best LER: {best_ler:.4f}")
+    logger.log(f"Best model saved at: {best_model_path}")
+    logger.log(f"Predictions saved to: {pred_json_path}")
