@@ -9,14 +9,14 @@ label_path: data/part2/train/labels.json
 original_image_dir: data/part2/train/images
 
 # ==============================
-# Tuning settings for Optuna
+# Tuning settings
 # ==============================
 
-batch_size: [4, 8, 16]             # Try multiple sizes
-learning_rate: [1e-4, 1e-2]        # Min/Max range for optuna.suggest_float
-epochs: [5, 10, 15]                  # Candidates for optuna.suggest_categorical
+batch_size: [4, 8, 16]          
+learning_rate: [1e-4, 1e-2]        
+epochs: [5, 10, 15]  
 optimizer: ["adam", "adamw", "sgd"]
-num_trials: 20                     # Number of Optuna trials to run
+num_trials: 20
 seed: 42
 ctc_blank_index: 0
 

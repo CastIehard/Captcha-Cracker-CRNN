@@ -21,7 +21,9 @@ captcha-cracker/
 ├── configs/ # YAML configuration files for tuning and experiments
 │ ├── tuning_S.yaml # small range tuning config
 │ ├── tuning_M.yaml # medium range tuning config
-│ └── tuning_L.yaml # large range tuning config
+│ ├── tuning_L.yaml # large range tuning config
+│ ├── crnn_best_parameters.yaml # final settings for base model
+│ └── crnn_best_parameters_augmentation_part3.yaml # final settings for augmented model
 │
 ├── data/ # Dataset root directory
 │ └── part2/ # Provided dataset (organized into train/val/test)
@@ -51,9 +53,6 @@ captcha-cracker/
 │
 ├── outputs/ # Results from experiments (auto-generated)
 │ └── tuning/ # Logs, checkpoints, Visualization, and models for tuning runs
-│
-├── augmentations/ # Low-level augmentation implementations
-│ └── augmentation.py
 │
 ├── main.py # Entry point to launch training/tuning
 ├── requirements.txt # Python dependencies
