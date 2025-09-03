@@ -30,19 +30,19 @@ augmentation_scenarios:
     params:
       do_remove_background: False
       do_make_glyphs_black: False
-      angle_range: [-60, 60]
-      shear_range: [-5, 5]
-      brightness_range: [0.8, 1.2]
-      contrast_range: [0.8, 1.2]
-      noise_std: [0.02, 0.05]
+      angle_range: [-40, 40]
+      shear_range: [-3, 3]
+      brightness_range: [0.9, 1.1]
+      contrast_range: [0.9, 1.1]
+      noise_std: [0.01, 0.05]
       blur_probability: 0.1
-      blur_radius: [0.5, 2.0]
-      lines_probability: 0.5
-      line_count: [1, 5]
-      line_thickness: [3, 4]
+      blur_radius: [0.5, 1.0]
+      lines_probability: 0.3
+      line_count: [1, 4]
+      line_thickness: [2, 3]
       points_probability: 0.5
-      point_count: [0, 3]
-      point_size: [5, 15]
+      point_count: [1, 4]
+      point_size: [3, 12]
 
 # ==============================
 # Output directories
