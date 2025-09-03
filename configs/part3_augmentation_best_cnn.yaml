@@ -1,0 +1,62 @@
+# ==============================
+# Dataset paths
+# ==============================
+
+train_root: data/part2/train
+val_root: data/part2/val
+test_root: data/part2/test
+label_path: data/part2/train/labels.json
+original_image_dir: data/part2/train/images
+
+# ==============================
+# Tuning settings for Optuna
+# ==============================
+
+batch_size: [16]                  
+learning_rate: [2e-4, 4e-4]            
+epochs: [50]                           
+optimizer: ["adamw"]                    
+num_trials: 4                          
+seed: 42
+ctc_blank_index: 0
+
+
+# ==============================
+# Augmentation scenarios
+# ==============================
+
+augmentation_scenarios:
+  - name: aug_to_mirror_part_3
+    params:
+      do_remove_background: False
+      do_make_glyphs_black: False
+      angle_range: [-60, 60]
+      shear_range: [-5, 5]
+      brightness_range: [0.8, 1.2]
+      contrast_range: [0.8, 1.2]
+      noise_std: [0.02, 0.05]
+      blur_probability: 0.1
+      blur_radius: [0.5, 2.0]
+      lines_probability: 0.5
+      line_count: [1, 5]
+      line_thickness: [3, 4]
+      points_probability: 0.5
+      point_count: [0, 3]
+      point_size: [5, 15]
+
+# ==============================
+# Output directories
+# ==============================
+
+output_base_dir: outputs/cnn_part3_augmentated/
+
+
+# ==============================
+# Post-analysis
+# ==============================
+
+analysis_scripts:
+  - plot_curves
+  - compare_trials
+  - plot_charset_freq
+  - plot_prediction_dist
