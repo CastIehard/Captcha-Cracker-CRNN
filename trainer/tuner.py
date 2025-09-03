@@ -42,17 +42,17 @@ def sample_random_params(cfg, existing_params=None):
         # Handle learning rate range or list
         if len(cfg["learning_rate"]) == 2 and isinstance(cfg["learning_rate"][0], (int, float)):
             # Range: sample log-uniform between min and max
-            lr_min, lr_max = cfg["learning_rate"]
+            lr_min, lr_max = float(cfg["learning_rate"][0]), float(cfg["learning_rate"][1])
             lr = random.uniform(lr_min, lr_max)
         else:
-            # List: sample from choices
-            lr = random.choice(cfg["learning_rate"])
+            # List: sample from choices and convert to float
+            lr = float(random.choice(cfg["learning_rate"]))
             
         epochs = random.choice(cfg["epochs"])
         optimizer = random.choice(cfg["optimizer"])
         
-        # Create parameter tuple for duplicate checking
-        param_tuple = (batch_size, lr, epochs, optimizer)
+        # Create parameter tuple for duplicate checking (round lr for comparison)
+        param_tuple = (batch_size, round(lr, 6), epochs, optimizer)
         
         if param_tuple not in existing_params:
             return {
@@ -82,12 +82,12 @@ def load_existing_trials(trial_log_path):
                     params = trial['params']
                     param_tuple = (
                         params['batch_size'],
-                        params['learning_rate'],
+                        round(float(params['learning_rate']), 6),  # Ensure float and round for comparison
                         params['epochs'],
                         params['optimizer']
                     )
                     existing_params.add(param_tuple)
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError, ValueError):
             pass
     return existing_params
 
