@@ -1,0 +1,18 @@
+augmentation_scenarios:
+  - name: aug_to_mirror_part_3
+    params:
+      do_remove_background: False
+      do_make_glyphs_black: False
+      angle_range: [-60, 60]
+      shear_range: [-5, 5]
+      brightness_range: [0.8, 1.2]
+      contrast_range: [0.8, 1.2]
+      noise_std: [0.02, 0.05]
+      blur_probability: 0.1
+      blur_radius: [0.5, 2.0]
+      lines_probability: 0.5
+      line_count: [1, 5]
+      line_thickness: [3, 4]
+      points_probability: 0.5
+      point_count: [0, 3]
+      point_size: [5, 15]

@@ -5,7 +5,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import time
 from augmentation import augment_image
-image_path = "augmentation/test.png"
+image_path = "augmentations/test.png"
 
 def _disabled_kwargs() -> Dict:
     """
@@ -29,6 +29,9 @@ def _disabled_kwargs() -> Dict:
         lines_probability=0.0,        # never draw lines
         line_count=None,
         line_thickness=None,
+        points_probability=0.0,       # never draw points
+        point_count=None,
+        point_size=None,
     )
 
 
@@ -47,7 +50,7 @@ def _scenarios() -> List[Tuple[str, Dict]]:
     s.append(("Original", _disabled_kwargs()))
 
     # Geometry
-    s.append(("Rotation +15°", {**_disabled_kwargs(), "angle_range": (15.0, 15.0)}))
+    s.append(("Rotation +60°", {**_disabled_kwargs(), "angle_range": (60.0, 60.0)}))
     s.append(("Rotation -15°", {**_disabled_kwargs(), "angle_range": (-15.0, -15.0)}))
     s.append(("Shear +10°", {**_disabled_kwargs(), "shear_range": (20.0, 20.0)}))
     s.append(("Shear -10°", {**_disabled_kwargs(), "shear_range": (-20.0, -20.0)}))
@@ -70,8 +73,8 @@ def _scenarios() -> List[Tuple[str, Dict]]:
         {**_disabled_kwargs(), "noise_std": (0.2, 0.2)}
     ))
     s.append((
-        "Noise (std=0.1)",
-        {**_disabled_kwargs(), "noise_std": (0.1, 0.1)}
+        "Noise (std=0.5)",
+        {**_disabled_kwargs(), "noise_std": (0.5, 0.5)}
     ))
     s.append((
         "Lines (5 @ 2px)",
@@ -80,6 +83,24 @@ def _scenarios() -> List[Tuple[str, Dict]]:
             "lines_probability": 1.0,
             "line_count": (5, 5),
             "line_thickness": (2, 2),
+        }
+    ))
+    s.append((
+        "Points (3 @ r=5-15)",
+        {
+            **_disabled_kwargs(),
+            "points_probability": 1.0,
+            "point_count": (3, 3),
+            "point_size": (5, 15),
+        }
+    ))
+    s.append((
+        "Points (8 @ r=1-4)",
+        {
+            **_disabled_kwargs(),
+            "points_probability": 0.5,
+            "point_count": (0, 3),
+            "point_size": (5, 15),
         }
     ))
 
