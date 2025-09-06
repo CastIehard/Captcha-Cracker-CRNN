@@ -14,51 +14,6 @@ This project focuses on developing and evaluating a robust CAPTCHA recognition m
 - Automated logging and checkpointing per trial
 - Built-in analysis suite for visualizing learning curves, error samples, confidence scores, and character distribution
 
-## Directory Structure
-
-```
-captcha-cracker/
-├── configs/ # YAML configuration files for tuning and experiments
-│ ├── tuning_S.yaml # small range tuning config
-│ ├── tuning_M.yaml # medium range tuning config
-│ ├── tuning_L.yaml # large range tuning config
-│ ├── crnn_best_parameters.yaml # final settings for base model
-│ └── crnn_best_parameters_augmentation_part3.yaml # final settings for augmented model
-│
-├── data/ # Dataset root directory
-│ └── part2/ # Provided dataset (organized into train/val/test)
-│
-├── models/ # Model definitions
-│ └── crnn.py # CRNN architecture
-│
-├── trainer/ # Training and evaluation logic
-│ ├── dataloader.py # CaptchaDataset and collate function
-│ ├── train.py # Training loop with checkpoints
-│ ├── evaluator.py # Evaluation metrics and prediction utilities
-│ └── tuner.py # Hyperparameter tuning orchestrator
-│
-├── utils/ # Utility modules
-│ ├── augmentor.py # Data augmentation controller
-│ ├── parser.py # Charset parsing and text-to-target utilities
-│ ├── checkpoint.py # Save/load model checkpoints
-│ ├── seed.py # Random seed control
-│ └── logger.py # Simple logging utility
-│
-├── analysis/ # Post-analysis and visualization scripts
-│ ├── run_all_analysis.py # Runner for executing multiple analysis tasks
-│ ├── plot_curves.py
-│ ├── compare_trials.py
-│ ├── plot_charset_freq.py
-│ └── plot_prediction_dist.py
-│
-├── outputs/ # Results from experiments (auto-generated)
-│ └── tuning/ # Logs, checkpoints, Visualization, and models for tuning runs
-│
-├── main.py # Entry point to launch training/tuning
-├── requirements.txt # Python dependencies
-└── README.md # Project documentation
-```
-
 ## Training and Tuning
 
 ### Running an Experiment
@@ -142,49 +97,6 @@ These tools help debug model behavior, compare augmentation effects, and ensure 
 
 All experiment results are saved under the **`outputs/`** directory.  
 This folder is automatically created during training and organized into subfolders for clarity.
-
-## Directory Layout
-
-```
-outputs/
-├── tuning_L/                         # ← output_base_dir (e.g., tuning_L, tuning_small)
-│   ├── checkpoints/                  # Checkpoints saved for each trial (per epoch)
-│   │   ├── aug_type_A_trial_1/
-│   │   │   ├── epoch_1.pth
-│   │   │   ├── epoch_2.pth
-│   │   │   └── checkpoint_best.pth
-│   │   └── ...
-│   │
-│   ├── models/                       # Final and best models for each trial
-│   │   ├── aug_type_A_trial_1/
-│   │   │   ├── final_model.pth
-│   │   │   └── best_model.pth
-│   │   └── ...
-│   │
-│   ├── logs/                         # Training history logs (JSON) per trial
-│   │   ├── aug_type_A_trial_1.json
-│   │   └── aug_type_B_trial_2.json
-│   │
-│   ├── predictions/                  # Predictions on the test set (JSON)
-│   │   ├── tuning_L_predictions.json
-│   │   └── ...
-│   │
-│   ├── analysis/                     # All visualization outputs collected here
-│   │   ├── curves/                   # Training curves (Loss and LER)
-│   │   │   ├── aug_type_A_trial_1_loss.png
-│   │   │   ├── aug_type_A_trial_1_ler.png
-│   │   │   └── ...
-│   │   │
-│   │   ├── comparison/              # Bar charts comparing trials (e.g., LER)
-│   │   │   └── final_ler_comparison.png
-│   │   │
-│   │   │
-│   │   └──  charset/                 # Frequency distribution of predicted characters
-│   │   │   └── predicted_charset_frequency.png
-│   │
-│   └── training_log.txt             # Global log file with trial-wise info
-
-```
 
 ## Contents Explained
 
